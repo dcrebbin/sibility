@@ -1,0 +1,40 @@
+{
+  "name": "sibility",
+  "version": "0.1.0",
+  "description": "CLI to generate OpenAI TTS audio with word-level alignment for Sibility",
+  "type": "module",
+  "bin": {
+    "sibility": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sibility/core": "workspace:*",
+    "commander": "^13.1.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "jiti": "^2.4.2",
+    "openai": "^4.77.0"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "@types/node": "^22.10.5",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3"
+  },
+  "license": "MIT"
+}
