@@ -75,15 +75,10 @@ export function extractPlainText(content: string): string {
 export function findActiveWordIndex(words: WordTiming[], currentTime: number): number {
   if (words.length === 0) return -1;
 
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    if (currentTime >= word.start && currentTime < word.end) {
+  for (let i = words.length - 1; i >= 0; i--) {
+    if (currentTime >= words[i].start) {
       return i;
     }
-  }
-
-  if (currentTime >= words[words.length - 1].end) {
-    return words.length - 1;
   }
 
   return -1;

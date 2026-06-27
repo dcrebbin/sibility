@@ -27,10 +27,13 @@ export interface UseSibilityPlaybackResult {
   currentWordIndex: number;
   highlightEndIndex: number;
   progress: number;
+  currentTime: number;
+  duration: number;
   play: () => void;
   pause: () => void;
   toggle: () => void;
   stop: () => void;
+  seek: (time: number) => void;
 }
 
 export function useSibilityPlayback({
@@ -44,8 +47,14 @@ export function useSibilityPlayback({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const rafRef = useRef<number | null>(null);
   const prevWordRef = useRef(-1);
+  const onWordChangeRef = useRef(onWordChange);
+  const onCompleteRef = useRef(onComplete);
+
+  onWordChangeRef.current = onWordChange;
+  onCompleteRef.current = onComplete;
 
   const highlightEndIndex =
     currentWordIndex >= 0 && highlightMode === "sentence"
@@ -56,17 +65,18 @@ export function useSibilityPlayback({
     (time: number) => {
       const index = findActiveWordIndex(manifest.words, time);
       const nextProgress = manifest.duration > 0 ? time / manifest.duration : 0;
+      setCurrentTime(time);
       setProgress(nextProgress);
 
       if (index !== prevWordRef.current) {
         prevWordRef.current = index;
         setCurrentWordIndex(index);
         if (index >= 0) {
-          onWordChange?.(index);
+          onWordChangeRef.current?.(index);
         }
       }
     },
-    [manifest.duration, manifest.words, onWordChange]
+    [manifest.duration, manifest.words]
   );
 
   const tick = useCallback(() => {
@@ -114,6 +124,7 @@ export function useSibilityPlayback({
     audio.currentTime = 0;
     setIsPlaying(false);
     setCurrentWordIndex(-1);
+    setCurrentTime(0);
     setProgress(0);
     prevWordRef.current = -1;
     if (rafRef.current !== null) {
@@ -122,6 +133,28 @@ export function useSibilityPlayback({
     }
   }, [audioRef]);
 
+  const seek = useCallback(
+    (time: number) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      const maxTime = manifest.duration > 0 ? manifest.duration : audio.duration;
+      const clamped = Math.max(0, Math.min(time, maxTime || 0));
+      audio.currentTime = clamped;
+
+      const index = findActiveWordIndex(manifest.words, clamped);
+      prevWordRef.current = index;
+      setCurrentWordIndex(index);
+      setCurrentTime(clamped);
+      setProgress(maxTime > 0 ? clamped / maxTime : 0);
+
+      if (index >= 0) {
+        onWordChangeRef.current?.(index);
+      }
+    },
+    [audioRef, manifest.duration, manifest.words]
+  );
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -129,17 +162,21 @@ export function useSibilityPlayback({
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentWordIndex(-1);
+      setCurrentTime(manifest.duration);
       setProgress(1);
       prevWordRef.current = -1;
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      onComplete?.();
+      onCompleteRef.current?.();
     };
 
     const handlePlay = () => {
       setIsPlaying(true);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -158,26 +195,28 @@ export function useSibilityPlayback({
 
     if (autoPlay) {
       play();
+    } else if (!audio.paused && rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(tick);
     }
 
     return () => {
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
     };
-  }, [audioRef, autoPlay, onComplete, play, tick]);
+  }, [audioRef, autoPlay, manifest.duration, play, tick]);
 
   return {
     isPlaying,
     currentWordIndex,
     highlightEndIndex,
     progress,
+    currentTime,
+    duration: manifest.duration,
     play,
     pause,
     toggle,
     stop,
+    seek,
   };
 }
